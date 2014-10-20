@@ -1,0 +1,6 @@
+_site
+_galleries
+.idea
+.DS_Store
+.sass-cache
+**/*.php

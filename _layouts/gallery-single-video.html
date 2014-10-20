@@ -1,0 +1,25 @@
+---
+layout: gallery-main
+---
+
+<div class="container" style="text-align: center;">
+  <div id="myVideo" width="90%">
+    <p>Loading the player....</p>
+  </div>
+</div>
+
+<script type="text/javascript" src="/assets/jwplayer/jwplayer.js"></script>
+
+<script type="text/javascript">
+  jwplayer("myVideo").setup({
+    file: "{{ page.video_url }}",
+    image: "{{ page.image_url }}",
+    title: "",
+    aspectratio: "16:9",
+    skin: "/assets/jwplayer/six.xml",
+    autostart: false,
+    stretching: "exactfit",
+    width: "90%",
+    controls: true
+  });
+</script>
