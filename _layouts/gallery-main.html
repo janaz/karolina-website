@@ -9,6 +9,16 @@ layout: gallery-empty
 </div>
 <p></p>
 
+{% if page.title != '.' %}
+<ul class="breadcrumb">
+  <li><a href="/">Start</a> <span class="divider">/</span></li>
+  {% for item in page.parents %}
+    <li><a href="{{item.page_url}}">{{ item.title }}</a> <span class="divider">/</span></li>
+  {% endfor %}
+  <li class="active">{{ page.title }}</li>
+</ul>
+{% endif %}
+
 {{ content }}
 
 <hr/>

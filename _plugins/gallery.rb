@@ -5,8 +5,9 @@ module Test
   class Magick
     class << self
       include Rake::FileUtilsExt
+
       def generate_thumbnail(src, dst, width, height, force = false)
-        return if !force && File.exists?(dst)
+        return if (!force) && File.exists?(dst)
         mkdir_p(File.dirname(dst))
         sh('convert',
           '-define', "jpeg:size=#{Integer(width)*2}x#{Integer(height)*2}",
@@ -22,8 +23,30 @@ module Test
         )
       end
 
+      def generate_video_thumbnail(src, dst, overlay, width, height, force = false)
+        return if (!force) && File.exists?(dst)
+        mkdir_p(File.dirname(dst))
+        sh('convert',
+          '-define', "jpeg:size=#{Integer(width)*2}x#{Integer(height)*2}",
+          src,
+          '-thumbnail', "#{Integer(width)}x#{Integer(height)}^",
+          '-gravity', 'center',
+          '-extent', "#{Integer(width)}x#{Integer(height)}",
+          '-quality', '80',
+          '-strip',
+          '-colorspace', 'rgb',
+          '-filter', 'Lanczos',
+          '-write', 'mpr:orig',
+          '+delete', 'mpr:orig',
+          overlay,
+          '-gravity', 'SouthWest',
+          '-composite',
+          dst
+        )
+      end
+
       def generate_resized(src, dst, size, force = false)
-        return if !force && File.exists?(dst)
+        return if (!force) && File.exists?(dst)
         mkdir_p(File.dirname(dst))
         sh('convert',
           src,
@@ -40,7 +63,7 @@ module Test
 
   class GalleryObject
 
-    attr_reader :site_root, :relative_name
+    attr_reader :site_root, :relative_name, :parent
 
     def initialize(site_root, relative_name, parent = nil)
       @site_root = site_root
@@ -49,12 +72,16 @@ module Test
       @full_name = File.join(@site_root, @relative_name)
     end
 
-    def page(site)
-      TheOnlyGalleryObjectPage.new(site, self)
+    def page(site, nodata = false)
+      TheOnlyGalleryObjectPage.new(site, self, nodata)
     end
 
     def static_file(site)
       Jekyll::StaticFile.new(site, site_root, dir, base_name) if image? || video?
+    end
+
+    def url(site)
+      page(site, true).url
     end
 
     def variant(size, force = false)
@@ -71,7 +98,12 @@ module Test
       base = "thumbnail_#{size}_#{File.basename(@full_name)}.jpg"
       rel = File.join(File.dirname(@relative_name), 'resized', base)
       full = File.join(@site_root, rel)
-      Test::Magick.generate_thumbnail(@full_name, full, size, size, force)
+      if video_object
+        overlay = File.join(File.dirname(__FILE__), 'overlay.png')
+        Test::Magick.generate_video_thumbnail(@full_name, full, overlay, size, size, force)
+      else
+        Test::Magick.generate_thumbnail(@full_name, full, size, size, force)
+      end
       self.class.new(@site_root, rel)
     end
 
@@ -239,8 +271,9 @@ module Test
   end
 
   class TheOnlyGalleryObjectPage < OverriddenPage
-    def initialize(site, gallery_object)
+    def initialize(site, gallery_object, nodata = false)
       @gallery_object = gallery_object
+      @nodata = nodata
       super(site, gallery_object.site_root, nil, nil)
     end
 
@@ -265,8 +298,7 @@ module Test
     def custom_template
       file = if @gallery_object.directory?
         if @gallery_object.index_object
-          @gallery_object.index_object.relative_name
-          # '_templates/index.html'
+          File.join('_galleries/karola',@gallery_object.index_object.relative_name)
         else
           '_layouts/gallery-index.html'
         end
@@ -280,6 +312,10 @@ module Test
     end
 
     def custom_data
+      return {
+        'title' => @gallery_object.base_name,
+      } if @nodata
+
       {
         'title' => @gallery_object.base_name,
         'media' => @gallery_object.media.map do |m|
@@ -288,7 +324,7 @@ module Test
           {
             'name' => m.base_name,
             'thumbnail_url' => thumbnail.thumbnail(200).static_file(site).destination(''),
-            'page_url' => m.page(site).url
+            'page_url' => m.url(site)
           }
         end,
         'galleries' => @gallery_object.directories.map do |d|
@@ -297,11 +333,20 @@ module Test
             'title' => d.page(site).data['title'],
             'name' => d.base_name,
             'thumbnail_url' => thumbnail.thumbnail(200).static_file(site).destination(''),
-            'page_url' => d.page(site).url
+            'page_url' => d.url(site)
           }
         end,
-        'pwnd' => 'Pwnd ' + @gallery_object.base_name
       }.tap do |data|
+        parents = []
+        parent = @gallery_object.parent
+        while parent
+          parents << {
+            'page_url' => parent.url(site),
+            'title' => parent.page(site, true).data['title']
+          } if parent.parent
+          parent = parent.parent
+        end
+        data['parents'] = parents.reverse
         if @gallery_object.video?
           data.merge!(
             'video_url' => @gallery_object.static_file(site).destination(''),
@@ -320,7 +365,7 @@ module Test
 
   class Generator < Jekyll::Generator
     def generate(site)
-      go = GalleryObject.new(File.join(site.source, '_galleries'), 'karola')
+      go = GalleryObject.new(File.join(site.source, '_galleries/karola'), '.')
       go.pages(site).each do |p|
         site.pages << p
       end
