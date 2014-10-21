@@ -20,3 +20,26 @@ namespace :jekyll do
 end
 
 task :default => %w(jekyll:start)
+
+task :generate_index_files do
+  require 'time'
+  require 'yaml'
+
+  hash = File.open('prod-data.txt').each.map{|l| l.split(/\t/)}.inject({}){|h,d| h[d[0]]={title:d[1],desc:d[2],date:Time.parse(d[3].to_s.strip)};h}
+  FileList['_galleries/karola/*'].select{|f| File.directory?(f)}.each do |dir|
+    if hash[File.basename(dir)]
+      info = hash[File.basename(dir)]
+      File.open(File.join(dir, 'index.md'), 'w') do |f|
+        f.write <<-EOF.gsub(/^\s+/,'')
+          ---
+          layout: gallery-index
+          title: #{info.fetch(:title)}
+          desc: #{info.fetch(:desc)}
+          date: #{info.fetch(:date)}
+          ---
+        EOF
+      end
+      puts "Wrote to #{dir}"
+    end
+  end
+end

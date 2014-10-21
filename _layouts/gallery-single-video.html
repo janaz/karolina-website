@@ -1,5 +1,5 @@
 ---
-layout: gallery-main
+layout: gallery-single-common
 ---
 
 <div class="container" style="text-align: center;">
@@ -12,8 +12,8 @@ layout: gallery-main
 
 <script type="text/javascript">
   jwplayer("myVideo").setup({
-    file: "{{ page.video_url }}",
-    image: "{{ page.image_url }}",
+    file: "{{ page.object_url }}",
+    image: "{{ page.fullsize_image_url }}",
     title: "",
     aspectratio: "16:9",
     skin: "/assets/jwplayer/six.xml",

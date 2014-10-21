@@ -72,6 +72,25 @@ module Test
       @full_name = File.join(@site_root, @relative_name)
     end
 
+    def to_hash
+      {
+        site_root: @site_root,
+        relative_name: @relative_name,
+      }
+    end
+
+    def eql? other
+      self == other
+    end
+
+    def == other
+      other.is_a?(self.class) && to_hash == other.to_hash
+    end
+
+    def hash
+      to_hash.hash
+    end
+
     def page(site, nodata = false)
       TheOnlyGalleryObjectPage.new(site, self, nodata)
     end
@@ -125,9 +144,8 @@ module Test
       st << static_file(site)
       st << static_files_resized(site, force)
       st << thumbnail_object.static_files(site) if video?
-      st.flatten.compact + (directories + media).map {|p| p.static_files(site, force)}.flatten
+      st.flatten.compact + (directories + media).map {|p| p.static_files(site, force)}.flatten.uniq
     end
-
 
     def index_object
       children.select(&:index?).first
@@ -168,7 +186,7 @@ module Test
     end
 
     def media?
-      (image? && video_object.nil?) || (video? && thumbnail_object)
+      (image? && video_object.nil?) || (video? && thumbnail_object_for_video)
     end
 
     def video_object
@@ -176,12 +194,26 @@ module Test
       related_object_with_ext(%w(mp4 flv MP4 FLV))
     end
 
-    def thumbnail_object
-      fail "Not a video #{@relative_name}" unless video?
+    def thumbnail_object_for_video
+      fail "Not video" unless video?
       related_object_with_ext(%w(jpg jpeg png JPG JPEG PNG))
     end
 
+    def thumbnail_object
+      @thumbnail_object ||= if video?
+        thumbnail_object_for_video
+      elsif directory?
+        all_images.sample
+      else
+        self
+      end
+    end
+
     def related_object_with_ext(extenstions)
+      if caller.size > 500
+        puts caller.join("\n")
+        exit 0
+      end
       extenstions.
         map{|ext| "#{relative_name_no_ext}.#{ext}"}.
         map{|rel_name| self.class.new(@site_root, rel_name)}.
@@ -193,15 +225,23 @@ module Test
     end
 
     def media_prev
-      idx = @parent.media.find_index(self) - 1
-      return nil if idx < 0
-      @parent.media[idx]
+      return unless @parent
+
+      idx = @parent.media.find_index(self)
+      return unless idx
+      return if idx - 1< 0
+      @parent.media[idx - 1]
     end
 
     def media_next
-      idx = @parent.media.find_index(self) + 1
-      return nil if idx >= @parent.media.count
-      @parent.media[idx]
+      return unless @parent
+      # if (@parent.media.count > 0)
+      #   require 'pry';binding.pry
+      # end
+      idx = @parent.media.find_index(self)
+      return unless idx
+      return if idx + 1 >= @parent.media.count
+      @parent.media[idx + 1]
     end
 
     def images
@@ -217,7 +257,7 @@ module Test
     end
 
     def directories
-      children.select(&:directory?)
+      @directories ||= children.select(&:directory?)
     end
 
     def children
@@ -311,61 +351,50 @@ module Test
       end
     end
 
-    def custom_data
-      return {
-        'title' => @gallery_object.base_name,
-      } if @nodata
-
+    def custom_data_defaults
       {
         'title' => @gallery_object.base_name,
+        'date' => Time.at(0),
+        'url' => url,
+        'thumbnail_url' => @gallery_object.thumbnail_object.thumbnail(200).static_file(site).destination(''),
+      }
+    end
+
+    def custom_data
+      return custom_data_defaults if @nodata
+
+      custom_data_defaults.merge({
         'media' => @gallery_object.media.map do |m|
-          thumbnail = m.video? ? m.thumbnail_object : m
-          # require 'pry';binding.pry
-          {
-            'name' => m.base_name,
-            'thumbnail_url' => thumbnail.thumbnail(200).static_file(site).destination(''),
-            'page_url' => m.url(site)
-          }
+          m.page(site, true).data
         end,
         'galleries' => @gallery_object.directories.map do |d|
-          thumbnail = d.all_images.sample
-          {
-            'title' => d.page(site).data['title'],
-            'name' => d.base_name,
-            'thumbnail_url' => thumbnail.thumbnail(200).static_file(site).destination(''),
-            'page_url' => d.url(site)
-          }
-        end,
+          d.page(site, true).data
+        end.sort_by{|g| g['date']}.reverse,
       }.tap do |data|
         parents = []
         parent = @gallery_object.parent
+        data['parent'] = parent.page(site, true).data if parent
         while parent
-          parents << {
-            'page_url' => parent.url(site),
-            'title' => parent.page(site, true).data['title']
-          } if parent.parent
+          parents << parent.page(site, true).data
           parent = parent.parent
         end
         data['parents'] = parents.reverse
-        if @gallery_object.video?
-          data.merge!(
-            'video_url' => @gallery_object.static_file(site).destination(''),
-            'image_url' => @gallery_object.thumbnail_object.variant(1280).static_file(site).destination('')
-          )
-        elsif @gallery_object.image?
-          data.merge!(
-            'image_url' => @gallery_object.variant(1280).static_file(site).destination(''),
-            'fullsize_image_url' => @gallery_object.static_file(site).destination('')
-          )
+        data['prev'] = @gallery_object.media_prev.page(site, true).data if @gallery_object.media_prev
+        data['next'] = @gallery_object.media_next.page(site, true).data if @gallery_object.media_next
+
+        if @gallery_object.image? || @gallery_object.video?
+          data['object_url'] = @gallery_object.static_file(site).destination('')
+          data['fullsize_image_url'] = @gallery_object.thumbnail_object.variant(1280).static_file(site).destination('')
         end
       end
+      )
     end
   end
 
 
   class Generator < Jekyll::Generator
     def generate(site)
-      go = GalleryObject.new(File.join(site.source, '_galleries/karola'), '.')
+      go = GalleryObject.new(File.join(site.source, '_galleries/karola'), '')
       go.pages(site).each do |p|
         site.pages << p
       end

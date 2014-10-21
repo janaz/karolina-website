@@ -5,15 +5,19 @@ layout: gallery-empty
 <div class="navbar navbar-inverse navbar-static-top">
   <div class="navbar-inner">
     <a class="brand" href="/">Karolina</a>
+    <ul class="nav pull-right">
+      <li><a class="disabled" href="#"><i class="icon-backward"></i> Poprzednie</a></li>
+      <li class="divider-vertical"></li>
+      <li><a class="disabled" href="#">Następne <i class="icon-forward"></i></a></li>
+    </ul>
   </div>
 </div>
 <p></p>
 
-{% if page.title != '.' %}
+{% if page.parent.title %}
 <ul class="breadcrumb">
-  <li><a href="/">Start</a> <span class="divider">/</span></li>
   {% for item in page.parents %}
-    <li><a href="{{item.page_url}}">{{ item.title }}</a> <span class="divider">/</span></li>
+    <li><a href="{{item.url}}">{{ item.title }}</a> <span class="divider">/</span></li>
   {% endfor %}
   <li class="active">{{ page.title }}</li>
 </ul>
@@ -24,5 +28,7 @@ layout: gallery-empty
 <hr/>
 
 <footer>
-    <p>Theme created by <a href="https://twitter.com/janowskit">@janowskit</a></p>
+  <p>
+    created by <a href="https://twitter.com/janowskit">@janowskit</a>
+  </p>
 </footer>
