@@ -1,9 +1,15 @@
 ---
-layout: gallery-single-common
+layout: gallery-main
 ---
 
 <p class="text-center">
   <a href="{{ page.object_url }}" title="{{ page.title}}">
-    <img src="{{page.fullsize_image_url}}" width="90%" />
+    <img src="{{page.fullsize_image_url}}"
+    {% if page.horizontal %}
+      width="90%"
+    {% else %}
+      width="50%"
+    {% endif %}
+    />
   </a>
 </p>

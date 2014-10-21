@@ -2,35 +2,36 @@
 layout: gallery-main
 ---
 
-<ul class="thumbnails">
-{% for item in page.galleries %}
-  <li class="span5">
-      <ul class="thumbnails">
-          <li class="span2">
-              <a href="{{ item.url }}" title="{{ item.title}}">
-                <img src="{{item.thumbnail_url}}" width="200" height="200" />
-              </a>
-          </li>
-          <li class="span3">
-              <h4>
-                <a href="{{ item.url }}" title="{{ item.title }}">
-                  {{ item.title }}
-                </a>
-              </h4>
-              <p>{{ item.date }}</p>
-              <p>{{ item.description }}</p>
-          </li>
-      </ul>
-  </li>
-{% endfor %}
-</ul>
+{{ content }}
 
-<ul class="thumbnails">
+{% if page.galleries != empty %}
+<div class="row">
+{% for item in page.galleries %}
+  <div class="col-sm-6 col-md-4">
+    <div class="thumbnail">
+      <a href="{{item.url}}">
+        <img src="{{item.thumbnail_url}}" width="200" height="200" />
+      </a>
+      <div class="caption">
+        <h3><a href="{{item.url}}">{{item.title}}</a></h3>
+        <p>{{item.desc}}</p>
+      </div>
+    </div>
+  </div>
+{% endfor %}
+</div>
+{% endif %}
+
+{% if page.media != empty %}
+<div class="row">
 {% for item in page.media %}
-  <li class="span2">
-    <a href="{{item.url}}" title="{{item.title}}">
+  <div class="col-sm-4 col-md-3">
+    <a href="{{item.url}}" class="thumbnail">
       <img src="{{item.thumbnail_url}}" width="200" height="200" />
     </a>
-  </li>
+  </div>
 {% endfor %}
-</ul>
+</div>
+{% endif %}
+
+

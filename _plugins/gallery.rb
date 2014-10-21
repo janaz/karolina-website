@@ -1,4 +1,5 @@
 require 'rake'
+require 'dimensions'
 
 module Test
 
@@ -45,12 +46,12 @@ module Test
         )
       end
 
-      def generate_resized(src, dst, size, force = false)
+      def generate_resized(src, dst, width, height, force = false)
         return if (!force) && File.exists?(dst)
         mkdir_p(File.dirname(dst))
         sh('convert',
           src,
-          '-resize', "#{Integer(size)}x#{Integer(size)}>",
+          '-resize', "#{Integer(width)}x#{Integer(height)}>",
           '-quality', '80',
           '-strip',
           '-colorspace', 'rgb',
@@ -73,7 +74,7 @@ module Test
     end
 
     def to_hash
-      {
+      @to_hash ||= {
         site_root: @site_root,
         relative_name: @relative_name,
       }
@@ -91,6 +92,12 @@ module Test
       to_hash.hash
     end
 
+    def horizontal
+      return unless image?
+      (w,h) = Dimensions.dimensions(@full_name)
+      w > h
+    end
+
     def page(site, nodata = false)
       TheOnlyGalleryObjectPage.new(site, self, nodata)
     end
@@ -99,21 +106,18 @@ module Test
       Jekyll::StaticFile.new(site, site_root, dir, base_name) if image? || video?
     end
 
-    def url(site)
-      page(site, true).url
-    end
-
-    def variant(size, force = false)
+    def variant(w, h, force = false)
       fail 'variants are only for images' unless image?
-      base = "variant_#{size}_#{File.basename(@full_name)}.jpg"
+      base = "variant_#{w}_#{h}_#{File.basename(@full_name)}.jpg"
       rel = File.join(File.dirname(@relative_name), 'resized', base)
       full = File.join(@site_root, rel)
-      Test::Magick.generate_resized(@full_name, full, size, force)
+      Test::Magick.generate_resized(@full_name, full, w, h, force)
       self.class.new(@site_root, rel)
     end
 
     def thumbnail(size, force = false)
       fail 'thumbnails are only for images' unless image?
+
       base = "thumbnail_#{size}_#{File.basename(@full_name)}.jpg"
       rel = File.join(File.dirname(@relative_name), 'resized', base)
       full = File.join(@site_root, rel)
@@ -130,7 +134,7 @@ module Test
       if image?
         [
           thumbnail(200, force).static_file(site),
-          variant(1280, force).static_file(site),
+          variant(1280, 720, force).static_file(site),
         ]
       end
     end
@@ -182,21 +186,23 @@ module Test
     end
 
     def all_images
-      images + directories.map{|d| d.all_images}.flatten
+      @all_images ||= (images + directories.map{|d| d.all_images}.flatten)
+      raise "No images for #{@full_name}" if @all_images.empty?
+      @all_images
     end
 
     def media?
-      (image? && video_object.nil?) || (video? && thumbnail_object_for_video)
+      @is_media ||= (image? && video_object.nil?) || (video? && thumbnail_object_for_video)
     end
 
     def video_object
       fail "Not an image #{@relative_name}" unless image?
-      related_object_with_ext(%w(mp4 flv MP4 FLV))
+      @video_object ||= related_object_with_ext(%w(mp4 flv MP4 FLV))
     end
 
     def thumbnail_object_for_video
       fail "Not video" unless video?
-      related_object_with_ext(%w(jpg jpeg png JPG JPEG PNG))
+      @thumbnail_object_for_video ||= related_object_with_ext(%w(jpg jpeg png JPG JPEG PNG))
     end
 
     def thumbnail_object
@@ -210,10 +216,6 @@ module Test
     end
 
     def related_object_with_ext(extenstions)
-      if caller.size > 500
-        puts caller.join("\n")
-        exit 0
-      end
       extenstions.
         map{|ext| "#{relative_name_no_ext}.#{ext}"}.
         map{|rel_name| self.class.new(@site_root, rel_name)}.
@@ -226,7 +228,6 @@ module Test
 
     def media_prev
       return unless @parent
-
       idx = @parent.media.find_index(self)
       return unless idx
       return if idx - 1< 0
@@ -235,9 +236,6 @@ module Test
 
     def media_next
       return unless @parent
-      # if (@parent.media.count > 0)
-      #   require 'pry';binding.pry
-      # end
       idx = @parent.media.find_index(self)
       return unless idx
       return if idx + 1 >= @parent.media.count
@@ -263,9 +261,9 @@ module Test
     def children
       #fail "Not a directory #{@relative_name}" unless directory?
       return [] unless directory?
-      Dir.entries(@full_name).
+      @children ||= Dir.entries(@full_name).
         reject{|entry| entry =~ /^\./}.
-        reject{|entry| entry == 'resized'}.sort.
+        reject{|entry| entry == 'resized'}.
         map{|entry| self.class.new(@site_root, File.join(@relative_name, entry), self)}
     end
   end
@@ -356,6 +354,7 @@ module Test
         'title' => @gallery_object.base_name,
         'date' => Time.at(0),
         'url' => url,
+        'horizontal' => @gallery_object.horizontal,
         'thumbnail_url' => @gallery_object.thumbnail_object.thumbnail(200).static_file(site).destination(''),
       }
     end
@@ -369,22 +368,22 @@ module Test
         end,
         'galleries' => @gallery_object.directories.map do |d|
           d.page(site, true).data
-        end.sort_by{|g| g['date']}.reverse,
+        end.sort_by{|g| g['date'].to_date}.reverse,
       }.tap do |data|
         parents = []
         parent = @gallery_object.parent
-        data['parent'] = parent.page(site, true).data if parent
         while parent
-          parents << parent.page(site, true).data
+          parents << parent.page(site, true).data if parent.parent
           parent = parent.parent
         end
         data['parents'] = parents.reverse
+        # data['parent'] = data['parents'].last
         data['prev'] = @gallery_object.media_prev.page(site, true).data if @gallery_object.media_prev
         data['next'] = @gallery_object.media_next.page(site, true).data if @gallery_object.media_next
 
         if @gallery_object.image? || @gallery_object.video?
           data['object_url'] = @gallery_object.static_file(site).destination('')
-          data['fullsize_image_url'] = @gallery_object.thumbnail_object.variant(1280).static_file(site).destination('')
+          data['fullsize_image_url'] = @gallery_object.thumbnail_object.variant(1280, 720).static_file(site).destination('')
         end
       end
       )

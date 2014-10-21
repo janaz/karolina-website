@@ -1,3 +1,6 @@
+require 'time'
+require 'yaml'
+
 namespace :jekyll do
   desc "compile and run the site"
   task :start do
@@ -21,10 +24,8 @@ end
 
 task :default => %w(jekyll:start)
 
+desc 'Generate index.md files'
 task :generate_index_files do
-  require 'time'
-  require 'yaml'
-
   hash = File.open('prod-data.txt').each.map{|l| l.split(/\t/)}.inject({}){|h,d| h[d[0]]={title:d[1],desc:d[2],date:Time.parse(d[3].to_s.strip)};h}
   FileList['_galleries/karola/*'].select{|f| File.directory?(f)}.each do |dir|
     if hash[File.basename(dir)]
@@ -41,5 +42,12 @@ task :generate_index_files do
       end
       puts "Wrote to #{dir}"
     end
+  end
+end
+
+desc 'remove all reized images'
+task :remove_resized_images do
+  FileList['_galleries/**/resized'].select{|f| File.directory?(f)}.each do |dir|
+    rm_rf dir
   end
 end
