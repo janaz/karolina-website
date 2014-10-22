@@ -17,14 +17,14 @@ layout: gallery-empty
 
     <!-- Collect the nav links, forms, and other content for toggling -->
     <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
-      {% if page.parents != empty %}
       <ul class="nav navbar-nav">
+        {% if page.parents != empty %}
         {% for item in page.parents %}
           <li><a href="{{item.url}}">{{ item.title }}</a></li>
         {% endfor %}
+        {% endif %}
         <li><p class="navbar-text">{{ page.title }}</p></li>
       </ul>
-      {% endif %}
 
       {% if page.object_url %}
       <ul class="nav navbar-nav navbar-right">
