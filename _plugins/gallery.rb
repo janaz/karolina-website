@@ -92,42 +92,50 @@ module Test
       to_hash.hash
     end
 
-    def horizontal
+    def horizontal?
       return unless image?
-      (w,h) = Dimensions.dimensions(@full_name)
-      w > h
+      @is_horizontal ||= begin
+        (w,h) = Dimensions.dimensions(@full_name)
+        w > h
+      end
     end
 
     def page(site, nodata = false)
-      TheOnlyGalleryObjectPage.new(site, self, nodata)
+      @page ||= {}
+      @page[nodata] ||= TheOnlyGalleryObjectPage.new(site, self, nodata)
     end
 
     def static_file(site)
-      Jekyll::StaticFile.new(site, site_root, dir, base_name) if image? || video?
+      @static_file ||= Jekyll::StaticFile.new(site, site_root, dir, base_name) if image? || video?
     end
 
     def variant(w, h, force = false)
+      @variants ||= {}
       fail 'variants are only for images' unless image?
-      base = "variant_#{w}_#{h}_#{File.basename(@full_name)}.jpg"
-      rel = File.join(File.dirname(@relative_name), 'resized', base)
-      full = File.join(@site_root, rel)
-      Test::Magick.generate_resized(@full_name, full, w, h, force)
-      self.class.new(@site_root, rel)
+      @variants[{w:w,h:h,force:force}] ||= begin
+        base = "variant_#{w}_#{h}_#{File.basename(@full_name)}.jpg"
+        rel = File.join(File.dirname(@relative_name), 'resized', base)
+        full = File.join(@site_root, rel)
+        Test::Magick.generate_resized(@full_name, full, w, h, force)
+        self.class.new(@site_root, rel)
+      end
     end
 
     def thumbnail(size, force = false)
+      @thumbnail ||= {}
       fail 'thumbnails are only for images' unless image?
-
-      base = "thumbnail_#{size}_#{File.basename(@full_name)}.jpg"
-      rel = File.join(File.dirname(@relative_name), 'resized', base)
-      full = File.join(@site_root, rel)
-      if video_object
-        overlay = File.join(File.dirname(__FILE__), 'overlay.png')
-        Test::Magick.generate_video_thumbnail(@full_name, full, overlay, size, size, force)
-      else
-        Test::Magick.generate_thumbnail(@full_name, full, size, size, force)
+      @thumbnail[{s:size,f:force}] ||= begin
+        base = "thumbnail_#{size}_#{File.basename(@full_name)}.jpg"
+        rel = File.join(File.dirname(@relative_name), 'resized', base)
+        full = File.join(@site_root, rel)
+        if video_object
+          overlay = File.join(File.dirname(__FILE__), 'overlay.png')
+          Test::Magick.generate_video_thumbnail(@full_name, full, overlay, size, size, force)
+        else
+          Test::Magick.generate_thumbnail(@full_name, full, size, size, force)
+        end
+        self.class.new(@site_root, rel)
       end
-      self.class.new(@site_root, rel)
     end
 
     def static_files_resized(site, force = false)
@@ -160,7 +168,7 @@ module Test
     end
 
     def exists?
-      File.exists?(@full_name)
+      @is_exists ||= File.exists?(@full_name)
     end
 
     def dir
@@ -172,7 +180,7 @@ module Test
     end
 
     def directory?
-      exists? && File.directory?(@full_name)
+      @is_directory ||= (exists? && File.directory?(@full_name))
     end
 
     def image?
@@ -354,7 +362,7 @@ module Test
         'title' => @gallery_object.base_name,
         'date' => Time.at(0),
         'url' => url,
-        'horizontal' => @gallery_object.horizontal,
+        'horizontal' => @gallery_object.horizontal?,
         'thumbnail_url' => @gallery_object.thumbnail_object.thumbnail(200).static_file(site).destination(''),
       }
     end
@@ -377,7 +385,6 @@ module Test
           parent = parent.parent
         end
         data['parents'] = parents.reverse
-        # data['parent'] = data['parents'].last
         data['prev'] = @gallery_object.media_prev.page(site, true).data if @gallery_object.media_prev
         data['next'] = @gallery_object.media_next.page(site, true).data if @gallery_object.media_next
 
@@ -393,6 +400,7 @@ module Test
 
   class Generator < Jekyll::Generator
     def generate(site)
+      warn "#{Time.now}: Gallery generator start"
       go = GalleryObject.new(File.join(site.source, '_galleries/karola'), '')
       go.pages(site).each do |p|
         site.pages << p
@@ -400,6 +408,7 @@ module Test
       go.static_files(site).each do |s|
         site.static_files << s
       end
+      warn "#{Time.now}: Gallery generator finish"
     end
   end
 end
