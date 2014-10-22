@@ -51,3 +51,41 @@ task :remove_resized_images do
     rm_rf dir
   end
 end
+
+desc 'build'
+task :build do
+  rm_rf "_site"
+  sh "jekyll build -t"
+end
+
+desc 'release'
+task :release do
+  tmp_config = "tmp-aws-creds-#{Time.now.to_f}"
+  content = <<-CONF.gsub(/^\s+/,'')
+    access_key = #{ENV.fetch('AWS_ACCESS_KEY_ID')}
+    secret_key = #{ENV.fetch('AWS_SECRET_ACCESS_KEY')}
+    access_token = #{ENV['AWS_SECURITY_TOKEN']}
+  CONF
+  bucket = ENV.fetch('BUCKET_NAME')
+  s3cmd = ENV.fetch('S3CMD', 's3cmd')
+  sh("#{s3cmd} --version")
+  rm_rf "_site"
+  sh "jekyll build -t"
+  begin
+    File.open(tmp_config, "w") {|f| f.write(content)}
+    t = Thread.new do
+      sh(
+        s3cmd,
+        '-c', tmp_config,
+        'sync', '--verbose',
+        '--acl-public', '--delete-removed', '--add-header="Cache-Control: max-age=3600, must-revalidate"',
+        '_site/', "s3://#{bucket}"
+      )
+    end
+    sleep 1
+    rm_f tmp_config
+    t.join
+  ensure
+    rm_f tmp_config
+  end
+end
