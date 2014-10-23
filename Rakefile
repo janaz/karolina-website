@@ -52,10 +52,14 @@ task :remove_resized_images do
   end
 end
 
-desc 'build'
-task :build do
+def build
   rm_rf "_site"
   sh "jekyll build -t"
+end
+
+desc 'build'
+task :build do
+  build
 end
 
 desc 'release'
@@ -69,16 +73,16 @@ task :release do
   bucket = ENV.fetch('BUCKET_NAME')
   s3cmd = ENV.fetch('S3CMD', 's3cmd')
   sh("#{s3cmd} --version")
-  rm_rf "_site"
-  sh "jekyll build -t"
+  build
   begin
     File.open(tmp_config, "w") {|f| f.write(content)}
     t = Thread.new do
+      max_age = 3600
       sh(
         s3cmd,
         '-c', tmp_config,
         'sync', '--verbose',
-        '--acl-public', '--delete-removed', '--add-header="Cache-Control: max-age=3600, must-revalidate"',
+        '--acl-public', '--delete-removed', "--add-header=Cache-Control:max-age=#{max_age}, must-revalidate",
         '_site/', "s3://#{bucket}"
       )
     end
