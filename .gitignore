@@ -1,7 +1,5 @@
 _site
-_galleries/**/*jpg
-_galleries/**/*mp4
-_galleries/**/*flv
+_galleries
 .idea
 .DS_Store
 .sass-cache
