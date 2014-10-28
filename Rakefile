@@ -73,7 +73,6 @@ task :release do
   bucket = ENV.fetch('BUCKET_NAME')
   s3cmd = ENV.fetch('S3CMD', 's3cmd')
   sh("#{s3cmd} --version")
-  build
   begin
     File.open(tmp_config, "w") {|f| f.write(content)}
     t = Thread.new do
@@ -81,9 +80,13 @@ task :release do
       sh(
         s3cmd,
         '-c', tmp_config,
-        'sync', '--verbose',
-        '--acl-public', '--delete-removed', "--add-header=Cache-Control:max-age=#{max_age}, must-revalidate",
-        '_site/', "s3://#{bucket}"
+        'sync', 
+        '--verbose',
+        '--acl-public', 
+        '--delete-removed', 
+        "--add-header=Cache-Control:max-age=#{max_age}, must-revalidate",
+        '_site/', 
+        "s3://#{bucket}"
       )
     end
     sleep 1
