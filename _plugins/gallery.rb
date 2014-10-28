@@ -271,7 +271,7 @@ module Test
       return [] unless directory?
       @children ||= Dir.entries(@full_name).
         reject{|entry| entry =~ /^\./}.
-        reject{|entry| entry == 'resized'}.
+        reject{|entry| entry == 'resized'}.sort.
         map{|entry| self.class.new(@site_root, File.join(@relative_name, entry), self)}
     end
   end
