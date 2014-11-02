@@ -18,7 +18,7 @@ module Test
           '-extent', "#{Integer(width)}x#{Integer(height)}",
           '-quality', '80',
           '-strip',
-          '-colorspace', 'rgb',
+#          '-colorspace', 'rgb',
           '-filter', 'Lanczos',
           dst
         )
@@ -35,7 +35,7 @@ module Test
           '-extent', "#{Integer(width)}x#{Integer(height)}",
           '-quality', '80',
           '-strip',
-          '-colorspace', 'rgb',
+#          '-colorspace', 'rgb',
           '-filter', 'Lanczos',
           '-write', 'mpr:orig',
           '+delete', 'mpr:orig',
@@ -54,7 +54,7 @@ module Test
           '-resize', "#{Integer(width)}x#{Integer(height)}>",
           '-quality', '80',
           '-strip',
-          '-colorspace', 'rgb',
+ #         '-colorspace', 'rgb',
           '-filter', 'Lanczos',
           dst
         )
