@@ -83,7 +83,9 @@ task :release do
         'sync', 
         '--verbose',
         '--acl-public', 
-        '--delete-removed', 
+        '--delete-removed',
+        '--no-check-md5', 
+        '--no-preserve',
         "--add-header=Cache-Control:max-age=#{max_age}, must-revalidate",
         '_site/', 
         "s3://#{bucket}"
@@ -96,3 +98,9 @@ task :release do
     rm_f tmp_config
   end
 end
+
+desc 'server'
+task 'server' do
+  sh "jekyll serve --skip-initial-build --no-watch"
+end
+
