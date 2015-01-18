@@ -2,6 +2,16 @@ require 'rake'
 require 'dimensions'
 
 module Test
+  class Zip
+    class << self
+      include Rake::FileUtilsExt
+      def generate_zip(sources, dst, force = false)
+        return if (!force) && File.exists?(dst)
+        mkdir_p(File.dirname(dst))
+        sh('zip', '-1', '-j', dst, *sources)
+      end
+    end
+  end
 
   class Magick
     class << self
@@ -64,7 +74,7 @@ module Test
 
   class GalleryObject
 
-    attr_reader :site_root, :relative_name, :parent
+    attr_reader :site_root, :relative_name, :parent, :full_name
 
     def initialize(site_root, relative_name, parent = nil)
       @site_root = site_root
@@ -106,7 +116,17 @@ module Test
     end
 
     def static_file(site)
-      @static_file ||= Jekyll::StaticFile.new(site, site_root, dir, base_name) if image? || video?
+      @static_file ||= Jekyll::StaticFile.new(site, site_root, dir, base_name) if image? || video? || zip?
+    end
+
+    def zip_file(site, force = false)
+      if media.size > 0
+        base = "#{File.basename(@full_name)}.zip"
+        rel = File.join(File.dirname(@relative_name), 'zip', base)
+        full = File.join(@site_root, rel)
+        Test::Zip.generate_zip(media.map(&:full_name), full, force)
+        self.class.new(@site_root, rel).static_file(site)
+      end
     end
 
     def variant(w, h, force = false)
@@ -153,6 +173,7 @@ module Test
 
     def static_files(site, force = false)
       st = []
+      st << zip_file(site,force)
       st << static_file(site)
       st << static_files_resized(site, force)
       st << thumbnail_object.static_files(site) if video?
@@ -191,6 +212,11 @@ module Test
     def video?
       exists? &&
         File.extname(@full_name) =~ /\.(flv|mp4)$/i
+    end
+
+    def zip?
+      exists? &&
+        File.extname(@full_name) =~ /\.(zip)$/i
     end
 
     def all_images
@@ -272,6 +298,7 @@ module Test
       @children ||= Dir.entries(@full_name).
         reject{|entry| entry =~ /^\./}.
         reject{|entry| entry == 'resized'}.sort.
+        reject{|entry| entry == 'zip'}.sort.
         map{|entry| self.class.new(@site_root, File.join(@relative_name, entry), self)}
     end
   end
@@ -387,10 +414,13 @@ module Test
         data['parents'] = parents.reverse
         data['prev'] = @gallery_object.media_prev.page(site, true).data if @gallery_object.media_prev
         data['next'] = @gallery_object.media_next.page(site, true).data if @gallery_object.media_next
-
+        zip_file = @gallery_object.zip_file(site)
         if @gallery_object.image? || @gallery_object.video?
           data['object_url'] = @gallery_object.static_file(site).destination('')
           data['fullsize_image_url'] = @gallery_object.thumbnail_object.variant(1280, 720).static_file(site).destination('')
+        end
+        if zip_file
+          data['zip'] = zip_file.destination('')
         end
       end
       )

@@ -4,6 +4,12 @@ layout: gallery-main
 
 {{ content }}
 
+{% if page.zip %}
+<div>
+<a href="{{ page.zip}}">Wszystkie zdjęcia i filmy w pliku ZIP</a>
+<div>
+<br/>
+{% endif %}
 {% if page.galleries != empty %}
 <div class="row">
 {% for item in page.galleries %}
